@@ -1,7 +1,7 @@
 import { Room, Client } from 'colyseus';
 import { OfficeState } from '../schema/OfficeState';
 import { Agent, Office, OfficeConfig, ConversationMessage } from '@agent-office/core';
-import { OllamaAdapter } from '@agent-office/adapters';
+import { OllamaAdapter, OpenAICompatibleAdapter } from '@agent-office/adapters';
 import { ToolExecutor } from '../tools/ToolExecutor';
 import { MemoryStore } from '../memory/MemoryStore';
 
@@ -30,7 +30,17 @@ export class OfficeRoom extends Room<OfficeState> {
     private demoTickCount = 0;
     private coreAgents: Map<string, Agent> = new Map();
     private thinkingLocks: Map<string, boolean> = new Map();
-    private ollamaAdapter = new OllamaAdapter('http://localhost:11434');
+    // Phase-0 spike: route agent inference through OpenRouter (OpenAI-compatible) when
+    // OPENROUTER_API_KEY is set; fall back to local Ollama otherwise.
+    // NOTE: OpenAICompatibleAdapter appends "/v1/chat/completions", so baseUrl ends at "/api".
+    private llmAdapter = process.env.OPENROUTER_API_KEY
+        ? new OpenAICompatibleAdapter('https://openrouter.ai/api', process.env.OPENROUTER_API_KEY, 'openrouter')
+        : new OllamaAdapter('http://localhost:11434');
+    // Default model per active adapter: a valid OpenRouter slug when on OpenRouter,
+    // else the local Ollama tag. Override with OFFICE_MODEL. Prevents a "live but frozen"
+    // office when OPENROUTER_API_KEY is set but OFFICE_MODEL is forgotten.
+    private defaultModel = process.env.OFFICE_MODEL
+        || (process.env.OPENROUTER_API_KEY ? 'openai/gpt-4o-mini' : 'llama3.2:latest');
     private hireCount = 0; // Counter for generating unique IDs
     private toolExecutor = new ToolExecutor();
     private memoryStore = new MemoryStore();
@@ -91,7 +101,7 @@ export class OfficeRoom extends Room<OfficeState> {
                 id, name, role, avatar: 'sprite.png',
                 inference: {
                     provider: 'ollama',
-                    model: 'llama3.2:latest',
+                    model: this.defaultModel,
                     systemPrompt: `You are ${name}, a ${role} in a virtual office. Be social, do your work, and collaborate with colleagues. Keep thoughts SHORT.`,
                 },
                 personality: {
@@ -110,7 +120,7 @@ export class OfficeRoom extends Room<OfficeState> {
                 memory: { shortTermLimit: 50 }
             });
 
-            coreAgent.setInferenceAdapter(this.ollamaAdapter);
+            coreAgent.setInferenceAdapter(this.llmAdapter);
             await coreAgent.initialize();
 
             // Load persistent memories from previous sessions
@@ -340,7 +350,7 @@ export class OfficeRoom extends Room<OfficeState> {
                                     id: hireId, name: hireName, role: hireRole, avatar: 'sprite.png',
                                     inference: {
                                         provider: 'ollama',
-                                        model: 'llama3.2:latest',
+                                        model: this.defaultModel,
                                         systemPrompt: `You are ${hireName}, a ${hireRole} who just joined the team at a virtual office. You were hired by ${coreAgent.config.name}. Be enthusiastic, helpful, and eager to learn. Introduce yourself to your colleagues. Keep thoughts SHORT.`,
                                     },
                                     personality: {
@@ -358,7 +368,7 @@ export class OfficeRoom extends Room<OfficeState> {
                                     memory: { shortTermLimit: 50 }
                                 });
 
-                                hireAgent.setInferenceAdapter(this.ollamaAdapter);
+                                hireAgent.setInferenceAdapter(this.llmAdapter);
                                 await hireAgent.initialize();
                                 this.coreAgents.set(hireId, hireAgent);
                                 this.thinkingLocks.set(hireId, false);
