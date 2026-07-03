@@ -9,10 +9,12 @@ export default function Home() {
   const [activeNav, setActiveNav] = useState<NavKey>("office");
 
   return (
-    <div className="flex h-screen min-w-[1040px] overflow-hidden">
-      <LeftSidebar activeNav={activeNav} onNavChange={setActiveNav} />
-      <OfficePanel />
-      <ChatPanel />
+    <div className="scroll-thin h-screen w-full overflow-x-auto overflow-y-hidden">
+      <div className="flex h-full min-w-[1040px]">
+        <LeftSidebar activeNav={activeNav} onNavChange={setActiveNav} />
+        <OfficePanel />
+        <ChatPanel />
+      </div>
     </div>
   );
 }

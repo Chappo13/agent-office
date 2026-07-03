@@ -90,7 +90,7 @@ export function ChatPanel() {
         <textarea
           rows={2}
           placeholder={t.chat.composerPlaceholder}
-          className="scroll-thin min-h-[44px] resize-none rounded-xl border border-line px-3 py-[11px] text-[13.5px] text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none"
+          className="scroll-thin min-h-[44px] resize-none rounded-xl border border-line px-3 py-[11px] text-[13.5px] text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/30"
         />
         <div className="flex items-center gap-[10px]">
           <button

@@ -16,6 +16,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     document.documentElement.lang = lang;
+    document.title = dictionaries[lang].meta.title;
   }, [lang]);
 
   const value = useMemo<LanguageContextValue>(

@@ -133,7 +133,21 @@ type OfficeAgentProps = {
 function OfficeAgent({ x, y, fill, initial, name, selected, onSelect }: OfficeAgentProps) {
   const tagWidth = Math.max(44, name.length * 9 + 26);
   return (
-    <g className="cursor-pointer" transform={`translate(${x},${y})`} onClick={onSelect}>
+    <g
+      className="cursor-pointer"
+      role="button"
+      tabIndex={0}
+      aria-label={name}
+      aria-pressed={selected}
+      transform={`translate(${x},${y})`}
+      onClick={onSelect}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onSelect();
+        }
+      }}
+    >
       {selected && (
         <circle
           className="animate-selection-spin"
