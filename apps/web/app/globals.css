@@ -65,6 +65,16 @@
   }
 }
 
+@keyframes agent-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-3px);
+  }
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .animate-typing-blink {
     animation: typing-blink 1.2s infinite;
@@ -72,5 +82,8 @@
   .animate-selection-spin {
     animation: selection-spin 12s linear infinite;
     transform-origin: center;
+  }
+  .animate-agent-bob {
+    animation: agent-bob 2.6s ease-in-out infinite;
   }
 }

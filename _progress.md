@@ -62,6 +62,45 @@ Verified: `tsc --noEmit` clean; `next dev -p 5174` boots, HTTP 200, HTML contain
 "Координатор" plus all other RU labels; dev log has no errors/warnings; PID killed after check,
 confirmed no stray `next dev -p 5174` process (port 5174 connection-refused after kill).
 
-## Next: Milestone A2
-Office: webp background + positioned agent sprites (replace SVG placeholder), idle/typing
-states, hover-tooltip. Adversarial-review gate.
+## Milestone A2 — DONE
+
+Isometric office render: agents are now positioned by GRID coordinates through a pure
+projection util, not hardcoded pixels — A3 can swap the mock array for live Colyseus
+x/y with zero layout changes.
+
+Created:
+- `apps/web/lib/iso.ts` — pure `isoProject(gx, gy, opts)` → `{x,y}` + `isoZIndex(gx,gy)`.
+  `screenX = (gx-gy)*(tileW/2)+originX`, `screenY = (gx+gy)*(tileH/2)+originY`.
+  Constants: GRID_SIZE=40, TILE_W=14, TILE_H=8, ORIGIN_X=320, ORIGIN_Y=60 (640×420 frame,
+  same as A1's placeholder viewBox). alice(10,10) -> (320,140); bob(20,15) -> (355,200).
+  Worked examples documented as comments (no test runner wired up yet — KISS).
+- `apps/web/components/office/OfficeScene.tsx` (client) — background layer (procedural
+  isometric room: floor diamond + 2 back walls + 3 desks + 2 plants, all placed via
+  isoProject; swappable for a generated image via optional `backgroundImageUrl` prop,
+  seam for A7) + sprite layer (`positions: OfficeAgentPosition[]`, paint-order sorted by
+  `isoZIndex`, idle bob animation guarded by `prefers-reduced-motion`, hover/focus tooltip
+  with role + "open chat" CTA, click/Enter/Space select with brand selection ring,
+  role/tabIndex/aria a11y matching A1's pattern).
+
+Edited:
+- `apps/web/components/layout/OfficePanel.tsx` — replaced the inline placeholder `<svg>`
+  block and the local `OfficeAgent` component with `<OfficeScene>`; mock positions
+  (`alice`/`bob`, matching real backend agent ids) built from `MOCK_AGENTS` + translated
+  name/role, `selectedAgentId` now a plain string id (was `"a"|"b"`). Topbar + RU hint kept.
+- `apps/web/app/globals.css` — added `agent-bob` keyframe + `.animate-agent-bob` class
+  inside the existing `prefers-reduced-motion: no-preference` block.
+- `apps/web/lib/i18n/dictionaries/{ru,en}.ts` — `office.hintStep` "A2"→"A7" (A2 no longer
+  the "real art" milestone — that's A7 now that positioning is real), reworded
+  `office.hintPrefix` accordingly, added `office.tooltipOpenChat` key (RU "Открыть чат" /
+  EN "Open chat").
+
+Verified: `tsc --noEmit` clean (exit 0). Booted on :5175 (NODE_ENV=development), HTTP 200,
+body contains RU labels ("Офис · изометрия", "Алиса", "Боб", "Координатор · онлайн", "A7"),
+rendered SVG `transform="translate(320,140)"` / `"translate(355,200)"` match the iso.ts math
+exactly, dev log has no errors/warnings. Killed after check, confirmed port 5175 free and no
+stray process (only pre-existing unrelated dev servers on :5174 and in other repos remained).
+
+## Next: Milestone A3
+Wire live Colyseus x/y into the `positions` array feeding `OfficeScene` (replace
+`MOCK_AGENTS` in OfficePanel.tsx) — no OfficeScene/iso.ts changes expected. Adversarial-review
+gate before A3 too.

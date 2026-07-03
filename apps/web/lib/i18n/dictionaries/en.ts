@@ -42,10 +42,11 @@ export const en: Dictionary = {
   office: {
     caption: "Office · isometric",
     hintPrefix:
-      "Click an agent → open a private chat. Real art (webp background + sprites) lands in step",
-    hintStep: "A2",
+      "Click an agent → open a private chat. The final generated office art lands in step",
+    hintStep: "A7",
     agentA: "Alice",
     agentB: "Bob",
+    tooltipOpenChat: "Open chat",
   },
   chat: {
     title: "Coordinator",

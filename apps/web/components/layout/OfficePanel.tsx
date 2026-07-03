@@ -1,15 +1,33 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { LangToggle } from "@/components/ui/LangToggle";
+import { OfficeScene, type OfficeAgentPosition } from "@/components/office/OfficeScene";
 
-type AgentId = "a" | "b";
+// MOCK positions (Step 0 verified spawns: alice(10,10), bob(20,15) on the
+// 40×40 grid). A3 replaces this array with live Colyseus state — OfficeScene
+// only ever consumes grid coords through isoProject, so nothing downstream
+// changes.
+const MOCK_AGENTS: Array<{ id: string; gx: number; gy: number; color: string }> = [
+  { id: "alice", gx: 10, gy: 10, color: "#4f5bd5" },
+  { id: "bob", gx: 20, gy: 15, color: "#7c3aed" },
+];
 
 export function OfficePanel() {
   const t = useT();
-  const [selectedAgentId, setSelectedAgentId] = useState<AgentId>("a");
+  const [selectedAgentId, setSelectedAgentId] = useState<string>("alice");
+
+  const positions: OfficeAgentPosition[] = useMemo(
+    () =>
+      MOCK_AGENTS.map((a) => ({
+        ...a,
+        name: a.id === "alice" ? t.office.agentA : t.office.agentB,
+        role: a.id === "alice" ? t.sidebar.coordinatorRole : t.sidebar.bobRole,
+      })),
+    [t],
+  );
 
   return (
     <main
@@ -46,69 +64,11 @@ export function OfficePanel() {
             {t.office.caption}
           </div>
 
-          <svg viewBox="0 0 640 420" className="w-[78%]">
-            <polygon
-              points="320,60 600,220 320,380 40,220"
-              fill="#e7ebf3"
-              stroke="#d5dae8"
-              strokeWidth={1.2}
-            />
-            <g stroke="#d5dae8" strokeWidth={1} opacity={0.8}>
-              <line x1={180} y1={140} x2={460} y2={300} />
-              <line x1={250} y1={100} x2={530} y2={260} />
-              <line x1={110} y1={180} x2={390} y2={340} />
-              <line x1={460} y1={140} x2={180} y2={300} />
-              <line x1={390} y1={100} x2={110} y2={260} />
-              <line x1={530} y1={180} x2={250} y2={340} />
-            </g>
-            <polygon
-              points="200,150 250,178 210,202 160,174"
-              fill="#dfe4f1"
-              stroke="#c7cde0"
-              strokeWidth={1.4}
-            />
-            <polygon
-              points="440,150 490,178 450,202 400,174"
-              fill="#dfe4f1"
-              stroke="#c7cde0"
-              strokeWidth={1.4}
-            />
-            <circle
-              cx={320}
-              cy={220}
-              r={34}
-              fill="none"
-              stroke="#4f5bd5"
-              strokeWidth={2}
-              strokeDasharray="5 5"
-              opacity={0.65}
-            />
-            <path d="M320 172 l7 10 h-14 z" fill="#4f5bd5" opacity={0.7} />
-            <path d="M320 268 l7 -10 h-14 z" fill="#4f5bd5" opacity={0.7} />
-            <path d="M258 220 l10 7 v-14 z" fill="#4f5bd5" opacity={0.7} />
-            <path d="M382 220 l-10 7 v-14 z" fill="#4f5bd5" opacity={0.7} />
-
-            <OfficeAgent
-              id="a"
-              x={205}
-              y={150}
-              fill="#4f5bd5"
-              initial={t.brand.mark}
-              name={t.office.agentA}
-              selected={selectedAgentId === "a"}
-              onSelect={() => setSelectedAgentId("a")}
-            />
-            <OfficeAgent
-              id="b"
-              x={445}
-              y={150}
-              fill="#7c3aed"
-              initial={t.office.agentB.slice(0, 1)}
-              name={t.office.agentB}
-              selected={selectedAgentId === "b"}
-              onSelect={() => setSelectedAgentId("b")}
-            />
-          </svg>
+          <OfficeScene
+            positions={positions}
+            selectedAgentId={selectedAgentId}
+            onSelectAgent={setSelectedAgentId}
+          />
 
           <div className="absolute inset-x-0 bottom-[14px] text-center text-[12.5px] text-ink-muted">
             {t.office.hintPrefix} <b className="text-brand">{t.office.hintStep}</b>.
@@ -116,67 +76,5 @@ export function OfficePanel() {
         </div>
       </div>
     </main>
-  );
-}
-
-type OfficeAgentProps = {
-  id: AgentId;
-  x: number;
-  y: number;
-  fill: string;
-  initial: string;
-  name: string;
-  selected: boolean;
-  onSelect: () => void;
-};
-
-function OfficeAgent({ x, y, fill, initial, name, selected, onSelect }: OfficeAgentProps) {
-  const tagWidth = Math.max(44, name.length * 9 + 26);
-  return (
-    <g
-      className="cursor-pointer"
-      role="button"
-      tabIndex={0}
-      aria-label={name}
-      aria-pressed={selected}
-      transform={`translate(${x},${y})`}
-      onClick={onSelect}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          onSelect();
-        }
-      }}
-    >
-      {selected && (
-        <circle
-          className="animate-selection-spin"
-          r={26}
-          cx={0}
-          cy={-4}
-          fill="none"
-          stroke="#4f5bd5"
-          strokeWidth={2.5}
-          strokeDasharray="4 4"
-        />
-      )}
-      <circle r={17} cx={0} cy={-4} fill={fill} stroke="#fff" strokeWidth={3} />
-      <text x={0} y={1} textAnchor="middle" fontFamily="'Pixelify Sans', ui-monospace, monospace" fontSize={15} fill="#fff">
-        {initial}
-      </text>
-      <rect
-        x={-tagWidth / 2}
-        y={18}
-        width={tagWidth}
-        height={18}
-        rx={9}
-        fill="#fff"
-        stroke="#e4e8f0"
-        strokeWidth={1}
-      />
-      <text x={0} y={31} textAnchor="middle" fontSize={11} fontWeight={600} fill="#1a1f36">
-        {name}
-      </text>
-    </g>
   );
 }
