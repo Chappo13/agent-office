@@ -292,7 +292,10 @@ export class OfficeRoom extends Room<OfficeState> {
                 // the prompt synchronously, so we restore it right after in .then/.catch.
                 const baseSystem = coreAgent.config.inference.systemPrompt;
                 const tone = this.agentTones.get(id);
-                if (tone) coreAgent.config.inference.systemPrompt = `${baseSystem}\n\n${this.tonePostfix(tone)}`;
+                // A4: apply the reply tone only when actually answering the user, so it
+                // doesn't leak into autonomous think cycles (agent-to-agent chatter).
+                const answeringUser = consumed.some((m) => m.from === 'User');
+                if (tone && answeringUser) coreAgent.config.inference.systemPrompt = `${baseSystem}\n\n${this.tonePostfix(tone)}`;
 
                 coreAgent.think({
                     time: this.state.officeTime,
@@ -304,6 +307,7 @@ export class OfficeRoom extends Room<OfficeState> {
                 }).then(async (decision) => {
                     coreAgent.config.inference.systemPrompt = baseSystem;
                     const hadUserMsg = consumed.some((m) => m.from === 'User');
+                    let repliedToUser = false;
                     agentState.action = decision.action;
 
                     if (decision.thought) {
@@ -316,11 +320,12 @@ export class OfficeRoom extends Room<OfficeState> {
                         // A4: if a user message drove this think, the reply goes to the
                         // user — deterministic, since models often address a colleague
                         // ("talk to Bob") instead of the user who actually asked.
-                        const repliesToUser = hadUserMsg || targetName.toLowerCase() === 'user' || targetName === '';
+                        const repliesToUser = hadUserMsg || targetName.toLowerCase() === 'user';
 
                         if (repliesToUser) {
                             this.broadcast('chat', { sender: coreAgent.config.name, text: decision.message });
                             this.emitHighlight('conversation', `${coreAgent.config.name} replied`, decision.message.slice(0, 120), id);
+                            repliedToUser = true;
                         } else {
                         let targetId = '';
                         this.coreAgents.forEach((a, aId) => {
@@ -494,6 +499,13 @@ export class OfficeRoom extends Room<OfficeState> {
                     if (Math.random() < 0.3) {
                         const recentMemories = coreAgent.memories.slice(-3);
                         await this.memoryStore.saveMemories(id, recentMemories, this.sessionId);
+                    }
+
+                    // A4: never leave a user message silent — if the model chose a
+                    // non-talk action (work/idle/use_tool), surface its thought as the
+                    // reply so the user always gets a response before we consume it.
+                    if (hadUserMsg && !repliedToUser) {
+                        this.broadcast('chat', { sender: coreAgent.config.name, text: (decision.message || decision.thought || 'On it.') });
                     }
 
                     // A4: consume-on-read — drop exactly the messages this think read

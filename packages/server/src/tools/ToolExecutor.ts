@@ -90,8 +90,9 @@ export class ToolExecutor {
         // Sandboxed: only allow reading from a safe directory
         const { readFile } = await import('fs/promises');
         try {
-            if (path.includes('..') || path.startsWith('/')) {
-                return { success: false, output: '', error: 'Path traversal not allowed.' };
+            const base = path.split('/').pop() || '';
+            if (path.includes('..') || path.startsWith('/') || base.startsWith('.') || /\.(env|key|pem|db|sqlite)$/i.test(base)) {
+                return { success: false, output: '', error: 'Access to this path is not allowed.' };
             }
             const content = await readFile(path, 'utf-8');
             return { success: true, output: content.slice(0, 500) };
