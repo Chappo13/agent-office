@@ -1,8 +1,18 @@
+"use client";
+
+import { useState } from "react";
+import { LeftSidebar, type NavKey } from "@/components/layout/LeftSidebar";
+import { OfficePanel } from "@/components/layout/OfficePanel";
+import { ChatPanel } from "@/components/layout/ChatPanel";
+
 export default function Home() {
+  const [activeNav, setActiveNav] = useState<NavKey>("office");
+
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-2">
-      <h1 className="text-3xl font-bold text-brand">AI Офис</h1>
-      <p className="text-ink">Каркас A0 — Next.js 14 готов</p>
-    </main>
+    <div className="flex h-screen min-w-[1040px] overflow-hidden">
+      <LeftSidebar activeNav={activeNav} onNavChange={setActiveNav} />
+      <OfficePanel />
+      <ChatPanel />
+    </div>
   );
 }

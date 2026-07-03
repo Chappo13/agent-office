@@ -1,8 +1,71 @@
+@font-face {
+  font-family: "Pixelify Sans";
+  src: url("/fonts/pixelify-sans-cyrillic.woff2") format("woff2");
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+
+@font-face {
+  font-family: "Pixelify Sans";
+  src: url("/fonts/pixelify-sans-latin.woff2") format("woff2");
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+2000-206F, U+2122;
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-body {
-  background-color: #fafbfc;
-  color: #1a1f36;
+@layer base {
+  body {
+    @apply bg-canvas text-ink antialiased;
+  }
+}
+
+/* thin scrollbar, used inside the office column + chat body */
+.scroll-thin {
+  scrollbar-width: thin;
+  scrollbar-color: theme("colors.line") transparent;
+}
+.scroll-thin::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.scroll-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scroll-thin::-webkit-scrollbar-thumb {
+  background-color: theme("colors.line");
+  border-radius: 20px;
+}
+
+@keyframes typing-blink {
+  0%,
+  80%,
+  100% {
+    opacity: 0.25;
+  }
+  40% {
+    opacity: 0.9;
+  }
+}
+
+@keyframes selection-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .animate-typing-blink {
+    animation: typing-blink 1.2s infinite;
+  }
+  .animate-selection-spin {
+    animation: selection-spin 12s linear infinite;
+    transform-origin: center;
+  }
 }

@@ -33,5 +33,35 @@ next dev's CSS pipeline again, check `printenv NODE_ENV` first.
 
 Branch: `agent/teamly-web` (off `agent/teamly-style-ui`).
 
-## Next: Milestone A1
-Full 3-zone shell in `apps/web/app/page.tsx` (not built yet — A0 was skeleton only).
+## Milestone A1 — DONE
+
+Ported the approved mockup (`teamly-shell-mockup.html`) into real Next.js/React/Tailwind
+components: static 3-zone shell (sidebar 256px / office 1fr / chat 388px), pixel-font chrome
+(Pixelify Sans self-hosted, cyrillic+latin @font-face with unicode-range), SVG isometric
+office placeholder, RU/EN toggle via a KISS context-based i18n layer.
+
+Created:
+- `apps/web/lib/i18n/dictionaries/{ru,en,index}.ts`, `apps/web/lib/i18n/LanguageProvider.tsx` (`useT`/`useLanguage`)
+- `apps/web/components/ui/{Avatar,StatusDot,NavItem,LangToggle,TonePill}.tsx`
+- `apps/web/components/layout/{LeftSidebar,OfficePanel,ChatPanel}.tsx`
+
+Edited:
+- `apps/web/tailwind.config.ts` — finalized token set to match spec exactly (brand-dark
+  #3f4bc5, brand-tint, ink-muted #6b7291, panel, sidebar, surface #eef1f6, line, amber)
+- `apps/web/app/globals.css` — @font-face (cyrillic+latin, local woff2, unicode-range),
+  thin-scrollbar utility, typing-blink + selection-spin keyframes (prefers-reduced-motion guarded)
+- `apps/web/app/layout.tsx` — wraps children in `LanguageProvider`
+- `apps/web/app/page.tsx` — composes the 3-zone shell, lifts `activeNav` state
+- `apps/web/package.json` — added `lucide-react` dependency
+
+Interactivity: active nav (useState), RU/EN toggle (context, swaps all copy incl. `<html lang>`),
+tone pill selection (useState), office agent click → `selectedAgentId` (visual dashed ring +
+`animate-selection-spin`). Send/chips/hire/model-tier are visual-only — wiring is A3–A5.
+
+Verified: `tsc --noEmit` clean; `next dev -p 5174` boots, HTTP 200, HTML contains "Офис" and
+"Координатор" plus all other RU labels; dev log has no errors/warnings; PID killed after check,
+confirmed no stray `next dev -p 5174` process (port 5174 connection-refused after kill).
+
+## Next: Milestone A2
+Office: webp background + positioned agent sprites (replace SVG placeholder), idle/typing
+states, hover-tooltip. Adversarial-review gate.
