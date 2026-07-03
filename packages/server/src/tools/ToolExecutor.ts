@@ -1,4 +1,3 @@
-import { exec } from 'child_process';
 import { tavily, type TavilyClient, type TavilySearchResponse } from '@tavily/core';
 
 export interface ToolResult {
@@ -22,8 +21,6 @@ export class ToolExecutor {
 
     async execute(toolName: string, params: any): Promise<ToolResult> {
         switch (toolName) {
-            case 'code_execute':
-                return this.executeCode(params.code, params.language || 'javascript');
             case 'web_search':
                 return this.webSearch(params.query);
             case 'write_note':
@@ -33,38 +30,6 @@ export class ToolExecutor {
             default:
                 return { success: false, output: '', error: `Unknown tool: ${toolName}` };
         }
-    }
-
-    private executeCode(code: string, language: string): Promise<ToolResult> {
-        return new Promise((resolve) => {
-            // Sandbox: only allow JS/TS, with timeout
-            if (language !== 'javascript' && language !== 'js') {
-                resolve({ success: false, output: '', error: `Only JavaScript is supported for sandboxed execution.` });
-                return;
-            }
-
-            // Wrap in a timeout to prevent infinite loops
-            const wrappedCode = `
-                const __timeout = setTimeout(() => { process.exit(1); }, 5000);
-                try {
-                    const result = (function() { ${code} })();
-                    if (result !== undefined) console.log(JSON.stringify(result));
-                    clearTimeout(__timeout);
-                } catch(e) {
-                    console.error(e.message);
-                    clearTimeout(__timeout);
-                    process.exit(1);
-                }
-            `;
-
-            exec(`node -e "${wrappedCode.replace(/"/g, '\\"')}"`, { timeout: 6000 }, (error, stdout, stderr) => {
-                if (error) {
-                    resolve({ success: false, output: stderr || error.message, error: error.message });
-                } else {
-                    resolve({ success: true, output: stdout.trim() });
-                }
-            });
-        });
     }
 
     private async webSearch(query: string): Promise<ToolResult> {

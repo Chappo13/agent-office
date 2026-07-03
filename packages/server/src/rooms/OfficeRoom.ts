@@ -29,7 +29,9 @@ export class OfficeRoom extends Room<OfficeState> {
     private office!: Office;
     private demoTickCount = 0;
     private coreAgents: Map<string, Agent> = new Map();
-    private thinkingLocks: Map<string, boolean> = new Map();
+    private thinkingLocks: Map<string, boolean> = new Map(); // A4: in-flight guard (actively awaiting LLM)
+    private nextThinkAt: Map<string, number> = new Map();    // A4: earliest ms-timestamp an agent may think again
+    private agentTones: Map<string, string> = new Map();     // A4: requested reply tone per agent (from chat)
     // Phase-0 spike: route agent inference through OpenRouter (OpenAI-compatible) when
     // OPENROUTER_API_KEY is set; fall back to local Ollama otherwise.
     // NOTE: OpenAICompatibleAdapter appends "/v1/chat/completions", so baseUrl ends at "/api".
@@ -111,11 +113,9 @@ export class OfficeRoom extends Room<OfficeState> {
                     breakFrequency: 120
                 },
                 capabilities: [
-                    { name: 'code_execute', description: 'Execute JavaScript code' },
                     { name: 'web_search', description: 'Search the web for information' },
                     { name: 'write_note', description: 'Write a note or memo' },
-                    { name: 'create_task', description: 'Create a task and assign it to yourself or another agent' },
-                    { name: 'hire_agent', description: 'Hire a new team member (intern, developer, designer). Params: { name: string, role: string }' }
+                    { name: 'create_task', description: 'Create a task and assign it to yourself or another agent' }
                 ],
                 memory: { shortTermLimit: 50 }
             });
@@ -134,8 +134,8 @@ export class OfficeRoom extends Room<OfficeState> {
             this.thinkingLocks.set(id, false);
         };
 
-        await setupCoreAgent('alice', 'Alice', 'Engineer', 10, 10);
-        await setupCoreAgent('bob', 'Bob', 'Product Manager', 20, 15);
+        await setupCoreAgent('alice', 'Alice', 'Coordinator', 10, 10);
+        await setupCoreAgent('bob', 'Bob', 'Researcher', 20, 15);
         this.rebuildRelationshipGraph();
         const savedLayout = await this.memoryStore.loadLayout('default');
         this.currentLayout = Array.isArray(savedLayout) ? savedLayout : [];
@@ -147,8 +147,32 @@ export class OfficeRoom extends Room<OfficeState> {
         });
 
         this.onMessage('chat', (client, message) => {
-            console.log(`Chat from ${client.sessionId}: ${message.text}`);
-            this.broadcast('chat', { sender: 'User', text: message.text });
+            const text = String(message?.text || '').trim();
+            if (!text) return;
+            const agentId = String(message?.agentId || 'alice'); // default: coordinator
+            const tone = message?.tone ? String(message.tone) : null;
+            console.log(`Chat from ${client.sessionId} -> ${agentId}: ${text}`);
+
+            // Echo the user's message into the shared chat log
+            this.broadcast('chat', { sender: 'User', text });
+
+            const targetAgent = this.coreAgents.get(agentId);
+            if (!targetAgent) return;
+
+            // Deliver to the agent's inbox (consumed on read, after the think)
+            targetAgent.receiveMessage({
+                from: 'User',
+                to: targetAgent.config.name,
+                content: text,
+                timestamp: this.state.officeTime,
+            });
+            if (tone) this.agentTones.set(agentId, tone);
+
+            // Safe immediate-think: make the agent eligible NOW so update() answers
+            // on its next tick. If it's mid-think (thinkingLocks), update() won't
+            // start a second think — the message waits in the inbox and is picked up
+            // when the current one finishes (releaseThink schedules a short cooldown).
+            this.nextThinkAt.set(agentId, 0);
         });
 
         this.onMessage('start-scenario', (client, message) => {
@@ -216,6 +240,26 @@ export class OfficeRoom extends Room<OfficeState> {
         return 'alice'; // fallback
     }
 
+    // A4: map a requested tone to a short instruction appended to the system prompt.
+    private tonePostfix(tone: string): string {
+        const map: Record<string, string> = {
+            neutral: 'a neutral, professional tone',
+            friendly: 'a warm, friendly tone',
+            formal: 'a formal, precise tone',
+        };
+        const hint = map[tone.toLowerCase()] || `a ${tone} tone`;
+        return `When you reply to the user, use ${hint}.`;
+    }
+
+    // A4: release the in-flight lock and set the next-eligible time. A pending
+    // (unconsumed) message → short cooldown so replies feel responsive; otherwise
+    // the normal ~15s autonomous think interval.
+    private releaseThink(id: string, coreAgent: Agent): void {
+        this.thinkingLocks.set(id, false);
+        const pending = coreAgent.getUnreadMessages().length > 0;
+        this.nextThinkAt.set(id, Date.now() + (pending ? 1500 : 15000));
+    }
+
     async update(delta: number) {
         if (Math.random() < 0.02) {
             console.log(`[Server] Agents: ${this.state.agents.size} | Session: ${this.sessionId}`);
@@ -225,11 +269,11 @@ export class OfficeRoom extends Room<OfficeState> {
 
         // ─── AGENT THINK CYCLE ───
         this.coreAgents.forEach((coreAgent, id) => {
-            if (!this.thinkingLocks.get(id)) {
+            if (!this.thinkingLocks.get(id) && Date.now() >= (this.nextThinkAt.get(id) ?? 0)) {
                 this.thinkingLocks.set(id, true);
 
                 const agentState = this.state.agents.get(id);
-                if (!agentState) return;
+                if (!agentState) { this.thinkingLocks.set(id, false); return; }
 
                 // Build nearby agents list
                 const nearbyAgents: { name: string; role: string; distance: number }[] = [];
@@ -242,23 +286,42 @@ export class OfficeRoom extends Room<OfficeState> {
                     }
                 });
 
+                // A4: snapshot exactly the messages this cycle reads (consume-on-read)
+                const consumed = coreAgent.getUnreadMessages();
+                // A4: temporary reply-tone postfix — think() bakes systemPrompt into
+                // the prompt synchronously, so we restore it right after in .then/.catch.
+                const baseSystem = coreAgent.config.inference.systemPrompt;
+                const tone = this.agentTones.get(id);
+                if (tone) coreAgent.config.inference.systemPrompt = `${baseSystem}\n\n${this.tonePostfix(tone)}`;
+
                 coreAgent.think({
                     time: this.state.officeTime,
                     location: `${agentState.x},${agentState.y}`,
                     nearbyAgents,
                     currentTask: coreAgent.currentTask || null,
-                    recentMessages: coreAgent.getUnreadMessages(),
+                    recentMessages: consumed,
                     memories: coreAgent.getRecentMemories(5)
                 }).then(async (decision) => {
+                    coreAgent.config.inference.systemPrompt = baseSystem;
+                    const hadUserMsg = consumed.some((m) => m.from === 'User');
                     agentState.action = decision.action;
 
                     if (decision.thought) {
                         agentState.thought = decision.thought;
                     }
 
-                    // ─── HANDLE TALK ACTION (Agent-to-Agent) ───
+                    // ─── HANDLE TALK ACTION ───
                     if (decision.action === 'talk' && decision.message) {
-                        const targetName = decision.target || '';
+                        const targetName = (decision.target || '').trim();
+                        // A4: if a user message drove this think, the reply goes to the
+                        // user — deterministic, since models often address a colleague
+                        // ("talk to Bob") instead of the user who actually asked.
+                        const repliesToUser = hadUserMsg || targetName.toLowerCase() === 'user' || targetName === '';
+
+                        if (repliesToUser) {
+                            this.broadcast('chat', { sender: coreAgent.config.name, text: decision.message });
+                            this.emitHighlight('conversation', `${coreAgent.config.name} replied`, decision.message.slice(0, 120), id);
+                        } else {
                         let targetId = '';
                         this.coreAgents.forEach((a, aId) => {
                             if (a.config.name.toLowerCase() === targetName.toLowerCase()) targetId = aId;
@@ -295,8 +358,8 @@ export class OfficeRoom extends Room<OfficeState> {
                                 importance: 0.7
                             }, this.sessionId);
                         }
+                        } // A4: end else (agent-to-agent talk)
 
-                        coreAgent.clearInbox(); // Clear after processing
                     }
 
                     // ─── HANDLE TOOL EXECUTION ───
@@ -337,7 +400,8 @@ export class OfficeRoom extends Room<OfficeState> {
                             const hireRole = hireParams.role || 'Intern';
                             const hireId = `hire_${this.hireCount}`;
 
-                            if (this.hireCount < 5 && !this.coreAgents.has(hireId)) {
+                            const HIRING_ENABLED = false; // A4: fixed 2-agent team in Phase 1
+                            if (HIRING_ENABLED && this.hireCount < 5 && !this.coreAgents.has(hireId)) {
                                 // Spawn at office door (top-center), then walk to their desk
                                 const spawnX = 20;
                                 const spawnY = 2;
@@ -432,11 +496,18 @@ export class OfficeRoom extends Room<OfficeState> {
                         await this.memoryStore.saveMemories(id, recentMemories, this.sessionId);
                     }
 
-                    setTimeout(() => this.thinkingLocks.set(id, false), 15000);
+                    // A4: consume-on-read — drop exactly the messages this think read
+                    // (by ref), keeping any that arrived mid-think, so the agent never
+                    // re-answers the same message on the next cycle.
+                    if (consumed.length > 0) {
+                        coreAgent.inbox = coreAgent.inbox.filter((m) => !consumed.includes(m));
+                    }
+                    this.releaseThink(id, coreAgent);
 
                 }).catch(err => {
+                    coreAgent.config.inference.systemPrompt = baseSystem; // restore tone
                     console.error(`Agent ${id} think error:`, err);
-                    setTimeout(() => this.thinkingLocks.set(id, false), 15000);
+                    this.releaseThink(id, coreAgent);
                 });
             }
         });

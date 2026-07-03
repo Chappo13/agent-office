@@ -133,6 +133,13 @@ export class Agent {
                 ? `Recent messages:\n${perception.recentMessages.map(m => `  ${m.from}: "${m.content}"`).join('\n')}`
                 : '';
 
+            // Demo-critical: when the user asks something, make answering THEM the
+            // priority — models otherwise drift into colleague chatter ("Hey Bob...").
+            const userMsgs = perception.recentMessages.filter(m => m.from === 'User');
+            const userDirective = userMsgs.length > 0
+                ? `\n>>> The USER just messaged you: "${userMsgs[userMsgs.length - 1].content}"\n>>> Answer the USER now: set action "talk", target "User", and put a direct, helpful reply to their message in "message". Do NOT talk to a colleague this turn.\n`
+                : '';
+
             const memoryStr = perception.memories.length > 0
                 ? `Your recent memories:\n${perception.memories.slice(-5).join('\n')}`
                 : '';
@@ -150,7 +157,7 @@ ${nearbyStr}
 ${taskStr}
 ${messageStr}
 ${memoryStr}
-
+${userDirective}
 You must decide your next action. Reply ONLY with a JSON object:
 {
   "thought": "your brief inner monologue (max 30 words)",
@@ -161,7 +168,8 @@ You must decide your next action. Reply ONLY with a JSON object:
 }
 
 Rules:
-- If someone sent you a message, you should respond with action "talk"
+- If a message is from "User", reply to them directly: action "talk", target "User", put your answer in "message".
+- If a colleague messaged you, you may reply with action "talk" and their name as target.
 - Keep thoughts SHORT (under 30 words)
 - If you have a task, work on it
 - Be collaborative and social`;
@@ -173,27 +181,38 @@ Rules:
             });
 
             const match = res.content.match(/\{[\s\S]*\}/);
-            const decisionStr = match ? match[0] : null;
+            if (match) {
+                try {
+                    const parsed = JSON.parse(match[0]);
+                    const decision: Decision = {
+                        thought: (parsed.thought || "Thinking...").slice(0, 120),
+                        action: parsed.action || "idle",
+                        target: parsed.target,
+                        message: parsed.message,
+                        toolCall: parsed.toolCall
+                    };
 
-            if (decisionStr) {
-                const parsed = JSON.parse(decisionStr);
-                const decision: Decision = {
-                    thought: (parsed.thought || "Thinking...").slice(0, 120),
-                    action: parsed.action || "idle",
-                    target: parsed.target,
-                    message: parsed.message,
-                    toolCall: parsed.toolCall
-                };
+                    // Auto-remember this thought
+                    this.addMemory({
+                        content: decision.thought,
+                        type: 'thought',
+                        timestamp: perception.time,
+                        importance: 0.3
+                    });
 
-                // Auto-remember this thought
-                this.addMemory({
-                    content: decision.thought,
-                    type: 'thought',
-                    timestamp: perception.time,
-                    importance: 0.3
-                });
+                    return decision;
+                } catch {
+                    // Invalid JSON — fall through to the plain-text fallback.
+                }
+            }
 
-                return decision;
+            // Robustness (demo-risk #1): model returned no valid JSON. Instead of
+            // going silently idle, if a user is waiting, reply with the raw text so
+            // the agent still responds. Autonomous think cycles stay quiet (idle).
+            const userWaiting = perception.recentMessages.some(m => m.from === 'User');
+            const raw = res.content.trim();
+            if (userWaiting && raw) {
+                return { thought: raw.slice(0, 120), action: 'talk', target: 'User', message: raw.slice(0, 500) };
             }
         } catch (e) {
             console.error(`[Agent ${this.config.name}] Inference failed:`, e);
