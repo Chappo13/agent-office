@@ -82,6 +82,7 @@
   .animate-selection-spin {
     animation: selection-spin 12s linear infinite;
     transform-origin: center;
+    transform-box: fill-box;
   }
   .animate-agent-bob {
     animation: agent-bob 2.6s ease-in-out infinite;

@@ -22,7 +22,11 @@ type OfficeSceneProps = {
 };
 
 const VIEW_W = 640;
-const VIEW_H = 420;
+// Extra headroom above the floor's top vertex (y=60) so the back walls
+// (WALL_HEIGHT tall, rising to y≈-72) and hover tooltips of far-corner agents
+// aren't clipped by the viewBox top.
+const VIEW_TOP = -84;
+const VIEW_H = 504;
 
 export function OfficeScene({
   positions,
@@ -39,12 +43,17 @@ export function OfficeScene({
   );
 
   return (
-    <svg viewBox={`0 0 ${VIEW_W} ${VIEW_H}`} className="w-[86%]" role="img" aria-label={t.office.caption}>
+    <svg
+      viewBox={`0 ${VIEW_TOP} ${VIEW_W} ${VIEW_H}`}
+      className="w-[80%]"
+      role="group"
+      aria-label={t.office.caption}
+    >
       {backgroundImageUrl ? (
         <image
           href={backgroundImageUrl}
           x={0}
-          y={0}
+          y={VIEW_TOP}
           width={VIEW_W}
           height={VIEW_H}
           preserveAspectRatio="xMidYMid slice"
