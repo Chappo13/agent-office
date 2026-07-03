@@ -4,8 +4,6 @@ export type OfficeAgent = {
   id: string;
   gx: number;
   gy: number;
-  name: string;
-  role: string;
   color: string;
   action: string;
   thought: string;

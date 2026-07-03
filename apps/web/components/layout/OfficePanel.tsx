@@ -18,15 +18,20 @@ export function OfficePanel() {
   // (OfficeScene/iso.ts untouched), so this is a straight id→position map.
   const positions: OfficeAgentPosition[] = useMemo(
     () =>
-      Object.values(agents).map((a) => ({
-        id: a.id,
-        gx: a.gx,
-        gy: a.gy,
-        name: a.name,
-        role: a.role,
-        color: a.color,
-      })),
-    [agents],
+      Object.values(agents).map((a) => {
+        // Display name/role are language-dependent → resolved here (reactive
+        // to `t`), not baked into the store at connect time.
+        const meta = (t.agents as Record<string, { name: string; role: string }>)[a.id];
+        return {
+          id: a.id,
+          gx: a.gx,
+          gy: a.gy,
+          name: meta?.name ?? a.id,
+          role: meta?.role ?? "",
+          color: a.color,
+        };
+      }),
+    [agents, t],
   );
   const isEmpty = positions.length === 0;
 
@@ -67,7 +72,9 @@ export function OfficePanel() {
           </div>
 
           {isEmpty ? (
-            <div className="text-sm text-ink-muted">{t.office.connecting}</div>
+            <div className="text-sm text-ink-muted">
+              {status === "offline" ? t.office.offline : t.office.connecting}
+            </div>
           ) : (
             <OfficeScene
               positions={positions}

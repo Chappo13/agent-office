@@ -46,6 +46,11 @@ export const ru = {
     hintStep: "A7",
     tooltipOpenChat: "Открыть чат",
     connecting: "Подключение…",
+    offline: "Нет связи с офисом",
+  },
+  agents: {
+    alice: { name: "Алиса", role: "Координатор" },
+    bob: { name: "Боб", role: "Ресёрчер" },
   },
   chat: {
     title: "Координатор",

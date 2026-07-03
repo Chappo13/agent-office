@@ -49,6 +49,11 @@ export const en: Dictionary = {
     hintStep: "A7",
     tooltipOpenChat: "Open chat",
     connecting: "Connecting…",
+    offline: "No connection to the office",
+  },
+  agents: {
+    alice: { name: "Alice", role: "Coordinator" },
+    bob: { name: "Bob", role: "Researcher" },
   },
   chat: {
     title: "Coordinator",

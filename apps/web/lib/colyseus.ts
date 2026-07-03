@@ -34,6 +34,13 @@ export type ServerAgentState = {
   reputation: number;
   riskLevel: number;
   momentum: number;
+  /**
+   * Per-instance schema callback — the real runtime value is a Schema. The
+   * MAP-level onChange does NOT fire on nested field mutation in
+   * @colyseus/schema 2.x, so field updates (movement/mood/action) must be
+   * observed per instance (useOfficeConnection; cf. the fork's Game.ts:615).
+   */
+  onChange(callback: () => void): () => void;
 };
 
 type SchemaMapLike<V> = {
