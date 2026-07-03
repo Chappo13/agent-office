@@ -4,30 +4,31 @@ import { useMemo, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { LangToggle } from "@/components/ui/LangToggle";
+import { ConnectionIndicator } from "@/components/ui/ConnectionIndicator";
 import { OfficeScene, type OfficeAgentPosition } from "@/components/office/OfficeScene";
-
-// MOCK positions (Step 0 verified spawns: alice(10,10), bob(20,15) on the
-// 40×40 grid). A3 replaces this array with live Colyseus state — OfficeScene
-// only ever consumes grid coords through isoProject, so nothing downstream
-// changes.
-const MOCK_AGENTS: Array<{ id: string; gx: number; gy: number; color: string }> = [
-  { id: "alice", gx: 10, gy: 10, color: "#4f5bd5" },
-  { id: "bob", gx: 20, gy: 15, color: "#7c3aed" },
-];
+import { useOfficeStore } from "@/lib/stores/officeStore";
 
 export function OfficePanel() {
   const t = useT();
   const [selectedAgentId, setSelectedAgentId] = useState<string>("alice");
+  const agents = useOfficeStore((s) => s.agents);
+  const status = useOfficeStore((s) => s.status);
 
+  // Live Colyseus agents (A3) — positions flow only through isoProject
+  // (OfficeScene/iso.ts untouched), so this is a straight id→position map.
   const positions: OfficeAgentPosition[] = useMemo(
     () =>
-      MOCK_AGENTS.map((a) => ({
-        ...a,
-        name: a.id === "alice" ? t.office.agentA : t.office.agentB,
-        role: a.id === "alice" ? t.sidebar.coordinatorRole : t.sidebar.bobRole,
+      Object.values(agents).map((a) => ({
+        id: a.id,
+        gx: a.gx,
+        gy: a.gy,
+        name: a.name,
+        role: a.role,
+        color: a.color,
       })),
-    [t],
+    [agents],
   );
+  const isEmpty = positions.length === 0;
 
   return (
     <main
@@ -47,6 +48,7 @@ export function OfficePanel() {
         <span className="rounded-full bg-surface px-[10px] py-1 text-xs font-semibold text-ink-muted">
           {t.topbar.onlinePill}
         </span>
+        <ConnectionIndicator status={status} />
         <div className="ml-auto flex items-center gap-[14px]">
           <div className="cursor-pointer rounded-full border border-[#f5e0b0] bg-[#fff7e8] px-3 py-[5px] text-xs font-semibold text-[#a9730a]">
             {t.topbar.tier}
@@ -64,11 +66,15 @@ export function OfficePanel() {
             {t.office.caption}
           </div>
 
-          <OfficeScene
-            positions={positions}
-            selectedAgentId={selectedAgentId}
-            onSelectAgent={setSelectedAgentId}
-          />
+          {isEmpty ? (
+            <div className="text-sm text-ink-muted">{t.office.connecting}</div>
+          ) : (
+            <OfficeScene
+              positions={positions}
+              selectedAgentId={selectedAgentId}
+              onSelectAgent={setSelectedAgentId}
+            />
+          )}
 
           <div className="absolute inset-x-0 bottom-[14px] text-center text-[12.5px] text-ink-muted">
             {t.office.hintPrefix} <b className="text-brand">{t.office.hintStep}</b>.

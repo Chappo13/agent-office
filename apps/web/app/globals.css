@@ -75,6 +75,16 @@
   }
 }
 
+@keyframes connection-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .animate-typing-blink {
     animation: typing-blink 1.2s infinite;
@@ -86,5 +96,8 @@
   }
   .animate-agent-bob {
     animation: agent-bob 2.6s ease-in-out infinite;
+  }
+  .animate-connection-pulse {
+    animation: connection-pulse 1.4s ease-in-out infinite;
   }
 }

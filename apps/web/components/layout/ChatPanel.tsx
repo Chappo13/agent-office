@@ -4,12 +4,14 @@ import { useState } from "react";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { Avatar } from "@/components/ui/Avatar";
 import { TonePill } from "@/components/ui/TonePill";
+import { useChatStore } from "@/lib/stores/chatStore";
 
 type Tone = "neutral" | "friendly" | "formal";
 
 export function ChatPanel() {
   const t = useT();
   const [tone, setTone] = useState<Tone>("neutral");
+  const messages = useChatStore((s) => s.messages);
 
   const tones: { key: Tone; label: string }[] = [
     { key: "neutral", label: t.chat.tones.neutral },
@@ -30,37 +32,61 @@ export function ChatPanel() {
       </div>
 
       <div className="scroll-thin flex flex-1 flex-col gap-[14px] overflow-y-auto p-[18px]">
-        <div className="flex max-w-[86%] flex-col items-end gap-1 self-end">
-          <div className="rounded-2xl rounded-br-[4px] bg-brand px-[13px] py-[10px] text-[13.5px] leading-normal text-white">
-            {t.chat.userMessage}
-          </div>
-          <div className="px-1 text-[11px] text-ink-muted">{t.chat.userWho}</div>
-        </div>
+        {messages.length > 0 ? (
+          // Live broadcast chat (A3) — newest last, "User" sender styled as
+          // outgoing (right), everyone else (agents/System) as incoming (left).
+          messages.map((m) =>
+            m.from === "User" ? (
+              <div key={m.id} className="flex max-w-[86%] flex-col items-end gap-1 self-end">
+                <div className="rounded-2xl rounded-br-[4px] bg-brand px-[13px] py-[10px] text-[13.5px] leading-normal text-white">
+                  {m.text}
+                </div>
+                <div className="px-1 text-[11px] text-ink-muted">{m.from}</div>
+              </div>
+            ) : (
+              <div key={m.id} className="flex max-w-[86%] flex-col gap-1">
+                <div className="px-1 text-[11px] text-ink-muted">{m.from}</div>
+                <div className="rounded-2xl rounded-bl-[4px] bg-surface px-[13px] py-[10px] text-[13.5px] leading-normal">
+                  {m.text}
+                </div>
+              </div>
+            ),
+          )
+        ) : (
+          <>
+            <div className="flex max-w-[86%] flex-col items-end gap-1 self-end">
+              <div className="rounded-2xl rounded-br-[4px] bg-brand px-[13px] py-[10px] text-[13.5px] leading-normal text-white">
+                {t.chat.userMessage}
+              </div>
+              <div className="px-1 text-[11px] text-ink-muted">{t.chat.userWho}</div>
+            </div>
 
-        <div className="flex max-w-[86%] flex-col gap-1">
-          <div className="px-1 text-[11px] text-ink-muted">{t.chat.aliceWho}</div>
-          <div className="rounded-2xl rounded-bl-[4px] bg-surface px-[13px] py-[10px] text-[13.5px] leading-normal">
-            {t.chat.aliceMessage}
-          </div>
-        </div>
+            <div className="flex max-w-[86%] flex-col gap-1">
+              <div className="px-1 text-[11px] text-ink-muted">{t.chat.aliceWho}</div>
+              <div className="rounded-2xl rounded-bl-[4px] bg-surface px-[13px] py-[10px] text-[13.5px] leading-normal">
+                {t.chat.aliceMessage}
+              </div>
+            </div>
 
-        <div className="flex max-w-[86%] flex-col gap-1">
-          <div className="px-1 text-[11px] text-ink-muted">{t.chat.bobWho}</div>
-          <div className="rounded-2xl rounded-bl-[4px] bg-surface px-[13px] py-[10px] text-[13.5px] leading-normal">
-            <span className="mr-1 inline-flex items-center gap-1 align-middle">
-              <i className="animate-typing-blink h-[6px] w-[6px] rounded-full bg-ink-muted opacity-50" />
-              <i
-                className="animate-typing-blink h-[6px] w-[6px] rounded-full bg-ink-muted opacity-50"
-                style={{ animationDelay: "0.2s" }}
-              />
-              <i
-                className="animate-typing-blink h-[6px] w-[6px] rounded-full bg-ink-muted opacity-50"
-                style={{ animationDelay: "0.4s" }}
-              />
-            </span>
-            {t.chat.bobTyping}
-          </div>
-        </div>
+            <div className="flex max-w-[86%] flex-col gap-1">
+              <div className="px-1 text-[11px] text-ink-muted">{t.chat.bobWho}</div>
+              <div className="rounded-2xl rounded-bl-[4px] bg-surface px-[13px] py-[10px] text-[13.5px] leading-normal">
+                <span className="mr-1 inline-flex items-center gap-1 align-middle">
+                  <i className="animate-typing-blink h-[6px] w-[6px] rounded-full bg-ink-muted opacity-50" />
+                  <i
+                    className="animate-typing-blink h-[6px] w-[6px] rounded-full bg-ink-muted opacity-50"
+                    style={{ animationDelay: "0.2s" }}
+                  />
+                  <i
+                    className="animate-typing-blink h-[6px] w-[6px] rounded-full bg-ink-muted opacity-50"
+                    style={{ animationDelay: "0.4s" }}
+                  />
+                </span>
+                {t.chat.bobTyping}
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
       <div className="flex gap-[7px] px-[14px] pt-[10px]">

@@ -36,14 +36,16 @@ export const ru = {
     tier: "⚡ Баланс · дёшево",
     langRu: "РУ",
     langEn: "EN",
+    connOnline: "Онлайн",
+    connOffline: "Оффлайн",
+    connConnecting: "Подключение",
   },
   office: {
     caption: "Офис · изометрия",
     hintPrefix: "Клик по агенту → личный чат. Финальный сгенерированный арт офиса появится на шаге",
     hintStep: "A7",
-    agentA: "Алиса",
-    agentB: "Боб",
     tooltipOpenChat: "Открыть чат",
+    connecting: "Подключение…",
   },
   chat: {
     title: "Координатор",

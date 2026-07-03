@@ -38,15 +38,17 @@ export const en: Dictionary = {
     tier: "⚡ Balanced · cheap",
     langRu: "RU",
     langEn: "EN",
+    connOnline: "Online",
+    connOffline: "Offline",
+    connConnecting: "Connecting",
   },
   office: {
     caption: "Office · isometric",
     hintPrefix:
       "Click an agent → open a private chat. The final generated office art lands in step",
     hintStep: "A7",
-    agentA: "Alice",
-    agentB: "Bob",
     tooltipOpenChat: "Open chat",
+    connecting: "Connecting…",
   },
   chat: {
     title: "Coordinator",
