@@ -206,6 +206,7 @@ Rules:
                 }
             }
 
+            console.warn('[think:non-json]', this.config.name); // telemetry: JSON parse miss
             // Robustness (demo-risk #1): model returned no valid JSON. Instead of
             // going silently idle, if a user is waiting, reply with the raw text so
             // the agent still responds. Autonomous think cycles stay quiet (idle).

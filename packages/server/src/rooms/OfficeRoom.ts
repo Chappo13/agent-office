@@ -41,8 +41,11 @@ export class OfficeRoom extends Room<OfficeState> {
     // Default model per active adapter: a valid OpenRouter slug when on OpenRouter,
     // else the local Ollama tag. Override with OFFICE_MODEL. Prevents a "live but frozen"
     // office when OPENROUTER_API_KEY is set but OFFICE_MODEL is forgotten.
+    // Model strategy: cheap Chinese open models as the workhorse — benchmarked on
+    // our own agent task (0 JSON parse-fails, ~$0.09/1M, fast). OFFICE_MODEL overrides
+    // per-role defaults below. GLM 5.2 is available but slower/pricier (premium tier).
     private defaultModel = process.env.OFFICE_MODEL
-        || (process.env.OPENROUTER_API_KEY ? 'openai/gpt-4o-mini' : 'llama3.2:latest');
+        || (process.env.OPENROUTER_API_KEY ? 'deepseek/deepseek-v4-flash' : 'llama3.2:latest');
     private hireCount = 0; // Counter for generating unique IDs
     private toolExecutor = new ToolExecutor();
     private memoryStore = new MemoryStore();
@@ -94,7 +97,7 @@ export class OfficeRoom extends Room<OfficeState> {
         this.office = new Office(config);
 
         // Setup Core Agents with AI capabilities
-        const setupCoreAgent = async (id: string, name: string, role: string, x: number, y: number) => {
+        const setupCoreAgent = async (id: string, name: string, role: string, x: number, y: number, model: string = this.defaultModel) => {
             this.state.createAgent(id, name);
             const state = this.state.agents.get(id);
             if (state) { state.x = x; state.y = y; }
@@ -103,7 +106,7 @@ export class OfficeRoom extends Room<OfficeState> {
                 id, name, role, avatar: 'sprite.png',
                 inference: {
                     provider: 'ollama',
-                    model: this.defaultModel,
+                    model,
                     systemPrompt: `You are ${name}, a ${role} in a virtual office. Be social, do your work, and collaborate with colleagues. Keep thoughts SHORT.`,
                 },
                 personality: {
@@ -134,8 +137,10 @@ export class OfficeRoom extends Room<OfficeState> {
             this.thinkingLocks.set(id, false);
         };
 
-        await setupCoreAgent('alice', 'Alice', 'Coordinator', 10, 10);
-        await setupCoreAgent('bob', 'Bob', 'Researcher', 20, 15);
+        // Per-role Chinese models (OFFICE_MODEL overrides both). Both benchmarked
+        // 0 parse-fails on our task; using two spreads load and exercises routing.
+        await setupCoreAgent('alice', 'Alice', 'Coordinator', 10, 10); // deepseek-v4-flash (default)
+        await setupCoreAgent('bob', 'Bob', 'Researcher', 20, 15, process.env.OFFICE_MODEL || 'qwen/qwen3-235b-a22b-2507');
         this.rebuildRelationshipGraph();
         const savedLayout = await this.memoryStore.loadLayout('default');
         this.currentLayout = Array.isArray(savedLayout) ? savedLayout : [];
