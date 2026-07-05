@@ -217,3 +217,87 @@ Verified:
   `noopSendChat` on every disconnect path.
 
 Diff: 4 files changed, 67 insertions(+), 5 deletions(-) (~72 lines touched).
+
+## Milestone A6 — DONE
+
+Sidebar tabs are now functional: clicking Офис/Задачи/Активность/Артефакты switches the
+CENTER column; the right ChatPanel (coordinator chat) stays mounted on every tab. Live
+`task-update` and `highlight-event` broadcasts (previously registered as no-op handlers in
+A3, per Step 0's server-contract review) now feed a real Task Board and Activity Feed.
+
+Created:
+- `apps/web/lib/stores/taskStore.ts` (zustand) — `tasks: Record<title, OfficeTask>`
+  (`id/title/agentId/agentName/status`), `upsertTask`, cap 50 via evicting
+  `Object.keys(tasks)[0]` (oldest-inserted; JS preserves string-key insertion order, and a
+  same-title re-broadcast updates in place without moving position).
+- `apps/web/lib/stores/activityStore.ts` (zustand) — `events: OfficeActivityEvent[]`
+  (`id/type/title/body/agentId?/time`), `pushEvent` (newest-first, `slice(0, 50)`).
+- `apps/web/components/layout/MainArea.tsx` — center-column router reading
+  `officeStore.activeTab`: `office`→`OfficePanel`, `tasks`→`TaskBoard`,
+  `activity`→`ActivityFeed`, `artifacts`→inline tasteful "Скоро" placeholder card.
+- `apps/web/components/layout/TaskBoard.tsx` — header + composer (text input + "Создать
+  задачу" button → `officeStore.sendTask({title})`, Enter-to-submit, disabled while
+  offline) + task list (title, agent display name resolved via `t.agents[agentId]` same
+  pattern as OfficePanel, falling back to the server's raw `agentName` then the id, status
+  pill with a per-status dot color) + empty state.
+- `apps/web/components/layout/ActivityFeed.tsx` — header + chronological (newest-first)
+  event list: dot color by highlight `type` (covers all 9 types seen in OfficeRoom.ts —
+  conversation/task/hiring/tool/scenario/character_arc/chaos/high_risk/audience_vote —
+  unmapped future types fall back to a grey dot), title, body, agent name when `agentId`
+  is present, local `formatRelativeTime()` helper (just now / Nm / Nh / Nd, i18n'd
+  suffixes, no interpolation infra existed in the codebase so kept to simple concatenation)
+  + empty state.
+
+Edited:
+- `apps/web/lib/stores/officeStore.ts` — added `activeTab: ActiveTab` (default `"office"`)
+  + `setActiveTab` (LeftSidebar's nav highlight + MainArea's switch both read this; kept
+  here rather than a new uiStore since it's simple cross-component UI state alongside
+  `selectedAgentId`/connection status this store already carries), and `sendTask` +
+  `setSendTask` — bound to `room.send("assign-task", payload)` the same way `sendChat` is
+  bound to `room.send("chat", payload)`.
+- `apps/web/lib/useOfficeConnection.ts` — `task-update` and `highlight-event` moved out of
+  `IGNORED_BROADCASTS` into real `room.onMessage` handlers → `taskStore.upsertTask` /
+  `activityStore.pushEvent` (id generated the same way as the existing `chat` handler:
+  `${Date.now()}-${random}`). `setSendTask((payload) => joined.send("assign-task", payload))`
+  wired on connect, reset to a local `noopSendTask` on every disconnect path (connect
+  failure, `onError`, `onLeave`, effect cleanup) — mirrors the existing `sendChat`/
+  `noopSendChat` pattern exactly. Tasks/activity are NOT reset on reconnect (unlike
+  `resetAgents()`): both stores are pure incremental broadcast logs with no full-resync
+  payload consumed (`tasks-sync` stays a no-op per the milestone's scope), so there's
+  nothing to discard on a short reconnect blip — a decision, not an oversight.
+- `apps/web/components/layout/LeftSidebar.tsx` — dropped the `activeNav`/`onNavChange`
+  props and local `NavKey` type; now reads/writes `officeStore.activeTab` directly via
+  `ActiveTab` (re-exported from officeStore).
+- `apps/web/app/page.tsx` — dropped the lifted `useState<NavKey>`; renders
+  `<LeftSidebar /><MainArea /><ChatPanel />` (no props threaded for the tab anymore).
+- `apps/web/lib/i18n/dictionaries/{ru,en}.ts` — added `tasks` (title/composerPlaceholder/
+  create/empty/unassigned/status.{in_progress,todo,done,blocked}), `activity`
+  (title/empty/timeJustNow/timeMinutesSuffix/timeHoursSuffix/timeDaysSuffix), `artifacts`
+  (comingSoonTitle/comingSoonBody). Key trees identical between ru/en (enforced by `en.ts`
+  typing itself as `Dictionary = typeof ru`).
+
+Verified:
+- `npm run typecheck --workspace=@agent-office/web` → `tsc --noEmit`, exit 0, clean.
+- Booted `NODE_ENV=development npx next dev -p 5177`: HTTP 200; response HTML contains all
+  four nav labels ("Задачи", "Активность", "Артефакты") plus the default-tab's
+  "Офис · изометрия" (confirms SSR still renders the `office` tab by default — no
+  hydration mismatch, since `officeStore.activeTab` defaults to `"office"` and only
+  changes client-side). `TaskBoard`/`ActivityFeed` aren't reachable via a pure SSR curl
+  (client zustand state, not a URL param) but are in `MainArea`'s static import graph, so
+  a type or syntax error in either would have failed the same `tsc`/webpack compile that
+  passed cleanly (webpack log: "Compiled / in 9s (626 modules)", no errors/warnings besides
+  benign stale-webpack-cache restore warnings unrelated to this change). Killed the :5177
+  process after (`fuser -k 5177/tcp`); confirmed :5174 (pre-existing, untouched) still
+  serving HTTP 200 throughout and after.
+- Code-traced: NavItem click → `LeftSidebar` `setActiveTab` → `MainArea` re-renders the
+  matching panel. Server `task-update`/`highlight-event` → `useOfficeConnection`'s new
+  handlers → `taskStore.upsertTask` / `activityStore.pushEvent` → `TaskBoard`/
+  `ActivityFeed` re-render via their `useTaskStore`/`useActivityStore` selectors.
+  `TaskBoard`'s composer → `officeStore.sendTask` → (bound on connect) →
+  `room.send("assign-task", {title})` → server persists + broadcasts `task-update` (+ a
+  `chat` system line, already rendered by the existing A3 chat listener) → round-trips
+  back through the same `task-update` handler into `taskStore`.
+
+## Next: Milestone A7
+Generated office art (background swap in OfficeScene's optional `backgroundImageUrl` seam)
++ Artifacts tab real content (currently a placeholder).

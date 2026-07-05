@@ -9,24 +9,26 @@ import {
 } from "@/lib/colyseus";
 import { useOfficeStore, type OfficeAgent } from "@/lib/stores/officeStore";
 import { useChatStore } from "@/lib/stores/chatStore";
+import { useTaskStore } from "@/lib/stores/taskStore";
+import { useActivityStore } from "@/lib/stores/activityStore";
 import { getAgentRole } from "@/lib/roles";
 
 const MAX_RECONNECT_ATTEMPTS = 3;
 const RECONNECT_DELAY_MS = 2000;
 
 // Store default is already this no-op; re-applied explicitly on every
-// disconnect path so calling sendChat while offline is always inert.
+// disconnect path so calling sendChat/sendTask while offline is always inert.
 const noopSendChat = () => {};
+const noopSendTask = () => {};
 
 // Server emits all of these (Step 0 + review of OfficeRoom.ts). Registered as
-// no-ops so colyseus.js doesn't warn "onMessage() not registered"; 'chat' is
-// handled separately with a real consumer.
+// no-ops so colyseus.js doesn't warn "onMessage() not registered"; 'chat',
+// 'task-update' and 'highlight-event' are handled separately with real
+// consumers (A6).
 const IGNORED_BROADCASTS = [
-  "task-update",
   "layout-sync",
   "relationship-update",
   "tasks-sync",
-  "highlight-event",
   "scenario-event",
 ];
 
@@ -73,6 +75,7 @@ export function useOfficeConnection(): void {
       leaveOffice(room);
       room = null;
       useOfficeStore.getState().setSendChat(noopSendChat);
+      useOfficeStore.getState().setSendTask(noopSendTask);
     };
 
     async function connect(): Promise<void> {
@@ -86,6 +89,7 @@ export function useOfficeConnection(): void {
         if (cancelled) return;
         useOfficeStore.getState().setStatus("offline");
         useOfficeStore.getState().setSendChat(noopSendChat);
+        useOfficeStore.getState().setSendTask(noopSendTask);
         scheduleReconnect();
         return;
       }
@@ -102,6 +106,7 @@ export function useOfficeConnection(): void {
       useOfficeStore.getState().resetAgents();
       useOfficeStore.getState().setStatus("online");
       useOfficeStore.getState().setSendChat((payload) => joined.send("chat", payload));
+      useOfficeStore.getState().setSendTask((payload) => joined.send("assign-task", payload));
 
       const agents = room.state.agents;
 
@@ -132,6 +137,41 @@ export function useOfficeConnection(): void {
           ts: Date.now(),
         });
       });
+      room.onMessage(
+        "task-update",
+        (message: { agentId: string; agentName: string; task: string; status: string }) => {
+          // Keyed by title (see taskStore) — the server broadcast carries no
+          // task id, just the title, so re-broadcasts of the same task update
+          // the existing board entry in place.
+          useTaskStore.getState().upsertTask({
+            id: message.task,
+            title: message.task,
+            agentId: message.agentId,
+            agentName: message.agentName,
+            status: message.status,
+          });
+        },
+      );
+      room.onMessage(
+        "highlight-event",
+        (message: {
+          type: string;
+          title: string;
+          body: string;
+          agentId: string | null;
+          scenario: string;
+          time: string;
+        }) => {
+          useActivityStore.getState().pushEvent({
+            id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            type: message.type,
+            title: message.title,
+            body: message.body,
+            agentId: message.agentId ?? undefined,
+            time: message.time,
+          });
+        },
+      );
       for (const type of IGNORED_BROADCASTS) {
         room.onMessage(type, () => {});
       }
@@ -145,12 +185,14 @@ export function useOfficeConnection(): void {
         if (cancelled) return;
         useOfficeStore.getState().setStatus("offline");
         useOfficeStore.getState().setSendChat(noopSendChat);
+        useOfficeStore.getState().setSendTask(noopSendTask);
       });
       room.onLeave(() => {
         room = null;
         if (cancelled) return; // our own cleanup leaveOffice() — don't reconnect
         useOfficeStore.getState().setStatus("offline");
         useOfficeStore.getState().setSendChat(noopSendChat);
+        useOfficeStore.getState().setSendTask(noopSendTask);
         scheduleReconnect();
       });
     }

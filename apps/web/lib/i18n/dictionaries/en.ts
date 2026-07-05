@@ -55,6 +55,31 @@ export const en: Dictionary = {
     alice: { name: "Alice", role: "Coordinator" },
     bob: { name: "Bob", role: "Researcher" },
   },
+  tasks: {
+    title: "Tasks",
+    composerPlaceholder: "Task title…",
+    create: "Create task",
+    empty: "No tasks yet",
+    unassigned: "Unassigned",
+    status: {
+      in_progress: "In progress",
+      todo: "To do",
+      done: "Done",
+      blocked: "Blocked",
+    },
+  },
+  activity: {
+    title: "Activity",
+    empty: "No events yet",
+    timeJustNow: "just now",
+    timeMinutesSuffix: "min ago",
+    timeHoursSuffix: "h ago",
+    timeDaysSuffix: "d ago",
+  },
+  artifacts: {
+    comingSoonTitle: "Coming soon",
+    comingSoonBody: "Artifacts created by agents will show up here.",
+  },
   chat: {
     title: "Coordinator",
     subtitle: "all tasks land here",

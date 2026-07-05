@@ -4,18 +4,17 @@ import { Activity, Folder, LifeBuoy, ListChecks, Settings, LayoutGrid } from "lu
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { Avatar } from "@/components/ui/Avatar";
 import { NavItem } from "@/components/ui/NavItem";
+import { useOfficeStore, type ActiveTab } from "@/lib/stores/officeStore";
 
-type NavKey = "office" | "tasks" | "activity" | "artifacts";
-
-type LeftSidebarProps = {
-  activeNav: NavKey;
-  onNavChange: (key: NavKey) => void;
-};
-
-export function LeftSidebar({ activeNav, onNavChange }: LeftSidebarProps) {
+export function LeftSidebar() {
   const t = useT();
+  // A6: nav highlight + main-area switch both read this — was local
+  // `useState` lifted into page.tsx before A6, now lives in officeStore so
+  // MainArea can react to it too.
+  const activeTab = useOfficeStore((s) => s.activeTab);
+  const setActiveTab = useOfficeStore((s) => s.setActiveTab);
 
-  const navItems: { key: NavKey; icon: typeof LayoutGrid; label: string; badge?: string }[] = [
+  const navItems: { key: ActiveTab; icon: typeof LayoutGrid; label: string; badge?: string }[] = [
     { key: "office", icon: LayoutGrid, label: t.nav.office },
     { key: "tasks", icon: ListChecks, label: t.nav.tasks, badge: t.nav.tasksBadge },
     { key: "activity", icon: Activity, label: t.nav.activity },
@@ -40,8 +39,8 @@ export function LeftSidebar({ activeNav, onNavChange }: LeftSidebarProps) {
             icon={item.icon}
             label={item.label}
             badge={item.badge}
-            active={activeNav === item.key}
-            onClick={() => onNavChange(item.key)}
+            active={activeTab === item.key}
+            onClick={() => setActiveTab(item.key)}
           />
         ))}
       </nav>
@@ -110,5 +109,3 @@ export function LeftSidebar({ activeNav, onNavChange }: LeftSidebarProps) {
     </aside>
   );
 }
-
-export type { NavKey };

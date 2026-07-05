@@ -52,6 +52,31 @@ export const ru = {
     alice: { name: "Алиса", role: "Координатор" },
     bob: { name: "Боб", role: "Ресёрчер" },
   },
+  tasks: {
+    title: "Задачи",
+    composerPlaceholder: "Название задачи…",
+    create: "Создать задачу",
+    empty: "Пока нет задач",
+    unassigned: "Не назначено",
+    status: {
+      in_progress: "В работе",
+      todo: "К выполнению",
+      done: "Готово",
+      blocked: "Заблокировано",
+    },
+  },
+  activity: {
+    title: "Активность",
+    empty: "Пока никаких событий",
+    timeJustNow: "только что",
+    timeMinutesSuffix: "мин назад",
+    timeHoursSuffix: "ч назад",
+    timeDaysSuffix: "дн назад",
+  },
+  artifacts: {
+    comingSoonTitle: "Скоро",
+    comingSoonBody: "Здесь появятся артефакты, которые создают агенты.",
+  },
   chat: {
     title: "Координатор",
     subtitle: "сюда приходят все задачи",
