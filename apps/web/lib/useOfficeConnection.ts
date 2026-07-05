@@ -14,6 +14,10 @@ import { getAgentRole } from "@/lib/roles";
 const MAX_RECONNECT_ATTEMPTS = 3;
 const RECONNECT_DELAY_MS = 2000;
 
+// Store default is already this no-op; re-applied explicitly on every
+// disconnect path so calling sendChat while offline is always inert.
+const noopSendChat = () => {};
+
 // Server emits all of these (Step 0 + review of OfficeRoom.ts). Registered as
 // no-ops so colyseus.js doesn't warn "onMessage() not registered"; 'chat' is
 // handled separately with a real consumer.
@@ -68,6 +72,7 @@ export function useOfficeConnection(): void {
       changeDisposers.clear();
       leaveOffice(room);
       room = null;
+      useOfficeStore.getState().setSendChat(noopSendChat);
     };
 
     async function connect(): Promise<void> {
@@ -80,6 +85,7 @@ export function useOfficeConnection(): void {
         console.error("[office] connect failed", err);
         if (cancelled) return;
         useOfficeStore.getState().setStatus("offline");
+        useOfficeStore.getState().setSendChat(noopSendChat);
         scheduleReconnect();
         return;
       }
@@ -95,6 +101,7 @@ export function useOfficeConnection(): void {
       attempts = 0;
       useOfficeStore.getState().resetAgents();
       useOfficeStore.getState().setStatus("online");
+      useOfficeStore.getState().setSendChat((payload) => joined.send("chat", payload));
 
       const agents = room.state.agents;
 
@@ -137,11 +144,13 @@ export function useOfficeConnection(): void {
         console.error("[office] room error", code, message);
         if (cancelled) return;
         useOfficeStore.getState().setStatus("offline");
+        useOfficeStore.getState().setSendChat(noopSendChat);
       });
       room.onLeave(() => {
         room = null;
         if (cancelled) return; // our own cleanup leaveOffice() — don't reconnect
         useOfficeStore.getState().setStatus("offline");
+        useOfficeStore.getState().setSendChat(noopSendChat);
         scheduleReconnect();
       });
     }

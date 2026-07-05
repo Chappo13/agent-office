@@ -171,3 +171,49 @@ Verified:
 ## Next: Milestone A4
 Chat wiring + immediate-think (consume-on-read fix from Step 0 finding #2) on Opus+Thinking.
 `chat` SEND becomes functional; ChatPanel's composer currently posts nowhere.
+
+## Milestone A5 — DONE
+
+Wired the ChatPanel composer end-to-end: user can send a chat message to the selected
+agent from the browser and see the live reply. Backend (A4) and the `chat` broadcast
+listener (A3) were already done — this only adds the send path + shared selection state.
+
+Edited:
+- `apps/web/lib/stores/officeStore.ts` — added `selectedAgentId` (default `"alice"`) +
+  `setSelectedAgentId`, and `sendChat: (payload: ChatSendPayload) => void` (default no-op)
+  + `setSendChat`. `ChatSendPayload = {text, tone, agentId}` exported for reuse.
+- `apps/web/lib/useOfficeConnection.ts` — on successful connect, `setSendChat((p) =>
+  joined.send("chat", p))`; reset back to a local `noopSendChat` on every disconnect path
+  (`connectOffice` failure, `room.onError`, `room.onLeave`, and effect cleanup/unmount) so
+  calling `sendChat` while offline is always inert, never throws.
+- `apps/web/components/layout/OfficePanel.tsx` — `selectedAgentId` moved out of local
+  `useState` into `useOfficeStore`; `OfficeScene` still just receives it as a prop
+  (untouched itself), now sourced from the store so ChatPanel reads the same value.
+- `apps/web/components/layout/ChatPanel.tsx` — controlled draft-text `useState`; tone
+  pills now map to a `tone` key already passed to `sendChat`; send on button click or
+  Enter (Shift+Enter inserts a newline via default textarea behavior, since preventDefault
+  only fires for plain Enter); trims text, no-ops if empty or status isn't `"online"`;
+  calls `sendChat({text, tone, agentId: selectedAgentId || "alice"})` only — never appends
+  to `chatStore` directly (the backend's echo broadcast + existing A3 listener already
+  renders the sent message, so no duplicate). Send button disabled + visually softened
+  (opacity/cursor) when not online. Header now shows `t.agents[selectedAgentId].name`,
+  falling back to `t.chat.title` ("Координатор"/"Coordinator") for unknown ids. Textarea
+  got an `aria-label` (reusing `composerPlaceholder`) since it had none before. Existing
+  live-vs-placeholder conditional (`messages.length > 0`) was already correct — no fix
+  needed there. No new i18n keys required (reused `chat.title` and
+  `chat.composerPlaceholder`).
+
+Verified:
+- `npm run typecheck --workspace=@agent-office/web` → `tsc --noEmit`, exit 0, clean.
+- Booted `NODE_ENV=development npm run dev --workspace=@agent-office/web -- -p 5177`:
+  HTTP 200; response HTML contains the composer's placeholder/aria-label text and
+  "Отправить" unconditionally (composer renders regardless of connection/message state).
+  Confirmed via `ss -ltnp` that :5177 was a distinct process from the pre-existing :5174
+  server (left untouched throughout); killed the :5177 process after the check, :5174
+  still up afterward.
+- Code-traced the full send path by reading the final files: ChatPanel's button
+  `onClick`/textarea `onKeyDown` → `handleSend()` → `useOfficeStore().sendChat(...)` →
+  in `useOfficeConnection.ts`, bound to `room.send("chat", payload)` on connect, reset to
+  `noopSendChat` on every disconnect path.
+
+Diff: 4 files changed, 67 insertions(+), 5 deletions(-) (~72 lines touched).

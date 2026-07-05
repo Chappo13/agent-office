@@ -12,13 +12,23 @@ export type OfficeAgent = {
 
 export type ConnectionStatus = "connecting" | "online" | "offline";
 
+export type ChatSendPayload = { text: string; tone: string; agentId: string };
+
 type OfficeStore = {
   agents: Record<string, OfficeAgent>;
   status: ConnectionStatus;
+  // Shared across OfficePanel (sets it on agent click) and ChatPanel (reads
+  // it as the send target) — was OfficePanel-local `useState` before A5.
+  selectedAgentId: string;
+  // Bound to `room.send("chat", payload)` by useOfficeConnection once
+  // connected; reset to a no-op while offline so calling it is always safe.
+  sendChat: (payload: ChatSendPayload) => void;
   setStatus: (status: ConnectionStatus) => void;
   upsertAgent: (agent: OfficeAgent) => void;
   removeAgent: (id: string) => void;
   resetAgents: () => void;
+  setSelectedAgentId: (id: string) => void;
+  setSendChat: (sendChat: (payload: ChatSendPayload) => void) => void;
 };
 
 // Empty initial state on purpose — live data only ever lands here from a
@@ -26,6 +36,8 @@ type OfficeStore = {
 export const useOfficeStore = create<OfficeStore>((set) => ({
   agents: {},
   status: "connecting",
+  selectedAgentId: "alice",
+  sendChat: () => {},
   setStatus: (status) => set({ status }),
   upsertAgent: (agent) =>
     set((state) => ({ agents: { ...state.agents, [agent.id]: agent } })),
@@ -36,4 +48,6 @@ export const useOfficeStore = create<OfficeStore>((set) => ({
       return { agents: next };
     }),
   resetAgents: () => set({ agents: {} }),
+  setSelectedAgentId: (selectedAgentId) => set({ selectedAgentId }),
+  setSendChat: (sendChat) => set({ sendChat }),
 }));

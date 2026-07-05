@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { ChevronDown } from "lucide-react";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { LangToggle } from "@/components/ui/LangToggle";
@@ -10,7 +10,10 @@ import { useOfficeStore } from "@/lib/stores/officeStore";
 
 export function OfficePanel() {
   const t = useT();
-  const [selectedAgentId, setSelectedAgentId] = useState<string>("alice");
+  // Shared with ChatPanel (A5) — was local useState, now lives in the store
+  // so ChatPanel can read it as the send target.
+  const selectedAgentId = useOfficeStore((s) => s.selectedAgentId);
+  const setSelectedAgentId = useOfficeStore((s) => s.setSelectedAgentId);
   const agents = useOfficeStore((s) => s.agents);
   const status = useOfficeStore((s) => s.status);
 
