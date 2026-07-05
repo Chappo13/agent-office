@@ -56,4 +56,4 @@ docs/build/
 
 # Temp / debug files
 *.tmp
-*.bak
+*.bak.vercel
